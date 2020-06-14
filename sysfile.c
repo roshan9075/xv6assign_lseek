@@ -15,6 +15,14 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+//#include "user.h"
+//#include "syscall.h"
+#include "x86.h"
+
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -417,6 +425,51 @@ sys_exec(void)
       return -1;
   }
   return exec(path, argv);
+}
+
+int sys_lseek(void) {
+	struct file *file;
+	int fd;
+	signed int offset;
+	int macro;
+	signed int newoffset=0;
+	int extra;
+	char *ptr;
+	
+	argfd(0, &fd, &file);
+	argint(1, &offset);
+	argint(2, &macro);
+	if(macro == SEEK_SET) {
+		newoffset = offset;
+		file->off = newoffset;
+		//cprintf(0, "%d", newoffset);
+	}
+	else if(macro == SEEK_CUR) {
+		newoffset = file->off + offset;
+		file->off = newoffset;
+	}
+	else if(macro == SEEK_END) {
+		newoffset = file->ip->size + offset;
+		//file->off = newoffset;
+	}
+	if(newoffset < file->ip->size) {
+		return -1;
+	}
+	if(newoffset > file->ip->size) {
+		extra = newoffset - file->ip->size;
+		ptr = kalloc();
+		while(extra > 0){
+			filewrite(file, ptr, extra);
+			extra = extra - 4096;
+			//printf(0, "%d", extra);
+		}
+		kfree(ptr);
+		//file->off = newoffset;
+	}
+	file->off = newoffset;
+	int x = file->off;
+	
+	return x;
 }
 
 int
